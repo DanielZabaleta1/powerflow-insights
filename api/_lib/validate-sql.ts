@@ -11,8 +11,12 @@
 
 const ALLOWED_TABLES = ["demo.leads", "demo.activities"];
 
+// pg_\w* (not a plain "pg_" alternative): "_" and the letter after it are
+// both word characters, so \b never matches between them — the naive
+// `pg_)\b` let anything like pg_sleep(30) or pg_read_file(...) straight
+// through this layer. See docs/security.md for how far that actually got.
 const FORBIDDEN_KEYWORDS =
-  /\b(insert|update|delete|drop|alter|create|grant|revoke|truncate|copy|vacuum|do|call|set|pg_)\b/i;
+  /\b(insert|update|delete|drop|alter|create|grant|revoke|truncate|copy|vacuum|do|call|set|pg_\w*)\b/i;
 
 const AGGREGATE_HINT = /\b(count|sum|avg|min|max|group\s+by)\b/i;
 

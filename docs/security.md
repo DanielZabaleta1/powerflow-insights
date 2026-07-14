@@ -27,7 +27,7 @@ it against hard rules: exactly one statement (semicolons inside string
 literals don't count, so `'a; DROP TABLE x'` as a filter value is legal
 data, not two statements); must start with `SELECT` or `WITH`; a keyword
 blocklist (`insert|update|delete|drop|alter|create|grant|revoke|truncate|
-copy|vacuum|do|call|set|pg_`); a table allowlist (only `demo.leads` and
+copy|vacuum|do|call|set|pg_\w*`); a table allowlist (only `demo.leads` and
 `demo.activities` may appear as schema-qualified identifiers); and an
 automatic `LIMIT 100` if the query doesn't already have one and isn't an
 aggregate.
@@ -47,6 +47,48 @@ api/_lib/validate-sql.ts`.
 This layer is deliberately not clever. It rejects and explains rather than
 trying to "fix" or rewrite a bad query — a validator that silently patches
 untrusted SQL is its own risk.
+
+#### A real gap found here, and what actually stopped it
+
+Code review caught a bug the tests above didn't: the keyword blocklist ended
+in `pg_)\b`. `\b` is a *word*-boundary — it matches between a word character
+and a non-word character. `_` and the letter right after it (`pg_sleep`,
+`pg_read_file`) are both word characters, so there's no boundary between
+them, and the regex never matched. `pg_` on its own was effectively a dead
+alternative. A query like `SELECT pg_sleep(30)` has no `FROM` clause either,
+so the table-allowlist check doesn't fire — the query would have sailed
+through layer 2 completely untouched.
+
+This is exactly the scenario the four-layer design exists for, so it was
+worth checking what layers 3 and 4 would actually have done about it, rather
+than just asserting they would. Bypassing the app and running both
+candidate queries directly against Postgres as `insights_readonly`, over the
+real pooler connection:
+
+```
+select pg_sleep(30)
+  -> FAILED after 6050ms: canceling statement due to statement timeout
+
+select pg_read_file('/etc/passwd')
+  -> FAILED: permission denied for function pg_read_file
+```
+
+Two different functions, stopped by two different layers, for two different
+reasons: `pg_sleep` is executable by any authenticated role by default in
+Postgres — nothing about the `insights_readonly` grants blocks calling it —
+so it actually started running, and layer 4's `statement_timeout` is what
+killed it at ~5s instead of it tying up the connection for 30. `pg_read_file`
+requires elevated privileges (`pg_read_server_files` or superuser) that
+`insights_readonly` was never granted, so layer 3 rejected it outright
+before it ever ran. Neither query returned data or affected anything.
+
+The fix (`pg_` → `pg_\w*`, closing the actual gap) is one character
+different and is layer 2 doing its job properly now — two more adversarial
+cases (`pg_sleep`, `pg_read_file`) are in the test suite. But the reason
+this didn't matter in production is layers 3 and 4, not layer 2. That's the
+whole thesis of defense in depth: a real bug shipped past the first
+safety check, and the blast radius was still "a five-second no-op" —
+not because the code was perfect, but because no single layer had to be.
 
 ### 3. The `insights_readonly` Postgres role (`db/schema.sql`)
 
