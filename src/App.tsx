@@ -1,122 +1,119 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useState } from "react";
+import { askQuestion } from "./lib/api";
+import { track } from "./lib/track";
+import type { AskResponse } from "./types";
+import AnswerChart from "./components/AnswerChart";
+import DataTable from "./components/DataTable";
+import SqlDetails from "./components/SqlDetails";
 
-function App() {
-  const [count, setCount] = useState(0)
+const SUGGESTIONS = [
+  "Where do leads drop off?",
+  "Which channel converts best?",
+  "How many leads did we get last month, by week?",
+  "What's the average time from contact to reply?",
+];
+
+type State =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "done"; result: AskResponse };
+
+export default function App() {
+  const [question, setQuestion] = useState("");
+  const [state, setState] = useState<State>({ status: "idle" });
+
+  useEffect(() => {
+    track("ask_opened");
+  }, []);
+
+  async function run(q: string) {
+    const trimmed = q.trim();
+    if (!trimmed || state.status === "loading") return;
+    setQuestion(trimmed);
+    setState({ status: "loading" });
+    try {
+      const result = await askQuestion(trimmed);
+      setState({ status: "done", result });
+    } catch (err) {
+      setState({ status: "error", message: err instanceof Error ? err.message : "Something went wrong." });
+    }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    run(question);
+  }
+
+  const loading = state.status === "loading";
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
+    <div className="page">
+      <header className="page-head">
+        <span className="wordmark">
+          <span className="light">POWER&nbsp;</span>
+          <span className="heavy">FLOW</span>
+          <span className="dot" />
+        </span>
+        <h1>
+          Ask your pipeline<span className="period">.</span>
+        </h1>
+        <p>Plain-English questions over the Power Flow OS funnel — every answer shows its work.</p>
+      </header>
+
+      <form className="ask-form" onSubmit={onSubmit}>
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="e.g. Which channel converts best?"
+          disabled={loading}
+          autoFocus
+        />
+        <button className="btn blue" disabled={loading || !question.trim()}>
+          Ask
         </button>
-      </section>
+      </form>
 
-      <div className="ticks"></div>
+      <div className="suggestions">
+        {SUGGESTIONS.map((s) => (
+          <button key={s} className="suggestion-chip" onClick={() => run(s)} disabled={loading} type="button">
+            {s}
+          </button>
+        ))}
+      </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      {state.status === "loading" && (
+        <div className="state-loading">
+          <span className="spinner" />
+          Thinking about "{question}"…
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {state.status === "error" && <div className="state-error">{state.message}</div>}
+
+      {state.status === "done" && state.result.refused && (
+        <div className="state-refused">{state.result.answer}</div>
+      )}
+
+      {state.status === "done" && !state.result.refused && (
+        <div className="answer">
+          <p className="answer-text">{state.result.answer}</p>
+
+          <AnswerChart chart={state.result.chart} rows={state.result.rows} />
+
+          {state.result.chart !== "table" && state.result.chart !== "number" && (
+            <DataTable rows={state.result.rows} />
+          )}
+
+          {state.result.sql && (
+            <SqlDetails sql={state.result.sql} explanation={state.result.explanation ?? ""} />
+          )}
+        </div>
+      )}
+
+      <p className="footer-note">
+        Runs against a synthetic dataset mirroring the production schema — real prospect data stays private.
+      </p>
+    </div>
+  );
 }
-
-export default App

@@ -15,9 +15,9 @@ The synthetic dataset stays deliberately separate from production data. Real pro
 - [x] Repo scaffolded (Vite + React + TS)
 - [x] `demo` schema + read-only Postgres role
 - [x] Synthetic seed data (500 leads, 1918 activities)
-- [ ] PostHog instrumentation on Power Flow OS
-- [ ] `/api/ask` — NL→SQL pipeline
-- [ ] Frontend
+- [x] PostHog instrumentation on Power Flow OS
+- [x] `/api/ask` — NL→SQL pipeline, 4 security layers
+- [x] Frontend
 - [ ] Docs + eval set + deploy
 
 ## Stack
