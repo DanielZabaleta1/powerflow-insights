@@ -18,7 +18,7 @@ type State =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "done"; result: AskResponse };
+  | { status: "done"; result: AskResponse; cached: boolean };
 
 export default function App() {
   const [question, setQuestion] = useState("");
@@ -35,16 +35,16 @@ export default function App() {
 
     // The 4 suggested questions always work, even if the live API is down
     // or the day's free-tier Gemini quota is exhausted — no network call.
-    const cached = CACHED_ANSWERS[trimmed];
-    if (cached) {
-      setState({ status: "done", result: cached });
+    const cachedResult = CACHED_ANSWERS[trimmed];
+    if (cachedResult) {
+      setState({ status: "done", result: cachedResult, cached: true });
       return;
     }
 
     setState({ status: "loading" });
     try {
       const result = await askQuestion(trimmed);
-      setState({ status: "done", result });
+      setState({ status: "done", result, cached: false });
     } catch (err) {
       setState({ status: "error", message: err instanceof Error ? err.message : "Something went wrong." });
     }
@@ -107,7 +107,10 @@ export default function App() {
 
       {state.status === "done" && !state.result.refused && (
         <div className="answer">
-          <p className="answer-text">{state.result.answer}</p>
+          <div>
+            {state.cached && <span className="cached-badge">Cached example</span>}
+            <p className="answer-text">{state.result.answer}</p>
+          </div>
 
           <AnswerChart chart={state.result.chart} rows={state.result.rows} />
 
