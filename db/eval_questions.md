@@ -1,17 +1,20 @@
-# Evaluation set — DRAFT, pending Daniel's review
+# Evaluation set — finalized, per Daniel + Fable's review
 
 **Status: not run yet.** Per project rule, this set is validated/edited by
 Daniel — his business questions, his judgment of "correct" — not
-self-graded by whoever builds the pipeline. This draft is a starting point
-based on `db/ground_truth.md` and the funnel logic in `db/generate.ts`,
-covering a spread of chart types and two questions that should be refused.
-Edit freely: change wording, drop, add, reorder. Nothing runs against these
-until you say go.
+self-graded by whoever builds the pipeline. Original draft was too close to
+the model's own few-shot examples (questions 1-4 nearly mirrored the SQL
+baked into `api/_lib/system-prompt.ts`, which would have scored the pipeline
+against cases it was explicitly shown how to answer). Revised per Fable's
+review: swapped 1-4 for novel angles, added one deliberately ambiguous
+question and one that sounds answerable but isn't (no per-message content is
+stored — an honest schema gap, not a bug). A harder, honest set beats an easy
+20/20 against the model's own examples.
 
-1. Where do leads drop off?
-2. Which channel converts best?
-3. How many leads did we get last month, by week?
-4. What's the average time from contact to reply?
+1. How are things going with the pipeline? *(deliberately ambiguous — no fixed metric named)*
+2. Which of our messages got the best response rate? *(expected: refused — message content/per-message outcomes aren't stored, only aggregate activity events)*
+3. What's the busiest month for closing deals?
+4. How many leads have been contacted but never moved past that stage?
 5. How many leads came in through LinkedIn?
 6. What percentage of leads are still sitting in "Ready," never contacted?
 7. Show me all leads from the referral channel.
