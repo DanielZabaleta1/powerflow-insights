@@ -59,7 +59,9 @@ The one-sentence version, tested against Google Cloud's own `pg_sleep`/`pg_read_
 - **1 correct-with-a-caveat** — asked for the single busiest month for closing deals, the model answered "March" (5 deals), which is true but omits that April tied it at 5; the query's `ORDER BY ... LIMIT 1` picks one winner from a tie without saying so.
 - **7 not yet attempted** (quota-blocked, including both deliberate-refusal test questions) — remainder of the run pending quota reset, tracked in `plans/portfolio/pasos_daniel.md`, not counted as failures since the model never got the chance to answer.
 
-Also surfaced: `to_char(created_at, 'Day')` returns Postgres's fixed-width, space-padded day names ("Thursday   ") — cosmetic, not a correctness bug, but worth a prompt fix (`FMDay` or `trim()`).
+Also surfaced: `to_char(created_at, 'Day')` returns Postgres's fixed-width, space-padded day names ("Thursday   ") — cosmetic, not a correctness bug.
+
+Both of those became prompt fixes, applied after this run and not retroactively scored against it (the 13 already-answered questions weren't re-run just to inflate the number): the system prompt now tells the model to return the top 5 rows instead of `LIMIT 1` for "single busiest/best" questions so a tie stays visible, and to wrap `to_char()` day/month output in `trim()`. The remaining 7 questions run once the daily quota resets, under the fixed prompt.
 
 ## Trade-offs
 
@@ -70,7 +72,7 @@ Also surfaced: `to_char(created_at, 'Day')` returns Postgres's fixed-width, spac
 | Claude vs. Gemini for NL→SQL | **Gemini 2.5 Flash** | Same provider as Power Flow OS's own automations — one stack, not two. $0/month on the free tier. The security architecture (4 layers) is provider-agnostic by design; swapping models is a config change, not a rewrite. |
 | One LLM call vs. two | **Two** (generate SQL, then summarize results) | Each call does one job. A single call trying to both write correct SQL *and* phrase a business-friendly sentence about data it hasn't seen yet either over-scopes the prompt or invites the model to guess at numbers instead of reading them. |
 | A deterministic pipeline vs. an agent/LangChain | **Deterministic pipeline** | Two fixed calls with a validator between them is auditable, has predictable latency, and costs a known amount per question. An agent framework earns its complexity when a task needs multi-step exploration — this one doesn't; the schema is two tables. |
-| Free-tier Gemini quota vs. paying for headroom | **Stayed on free tier, accepted the ceiling** | New Google Cloud projects default to a 20-requests/day cap for `gemini-2.5-flash` regardless of which project — not per-key, per-project. Real single-user traffic never approaches that; running a 20-question × 2-call eval batch does. Kept the low-traffic real cost at $0 rather than enabling billing to make one-off bulk testing more convenient. |
+| Free-tier Gemini quota vs. paying for headroom | **Stayed on free tier, degrade gracefully instead** | New Google Cloud projects default to a 20-requests/day cap for `gemini-2.5-flash`, per project, not per key. A single real user never approaches that; a bulk eval batch or a public demo getting a handful of visitors in one day can. Rather than pay for headroom a single-user tool doesn't need, the app degrades on purpose: the 4 suggested questions are answered from a small cache of real, previously-verified results — zero API calls, always available — and a live `429` from Gemini returns a plain "today's demo limit is reached, try an example question" instead of a raw error. The failure mode is "the live demo pauses for a day," not "the page breaks." |
 
 ## Cost
 

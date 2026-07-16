@@ -22,6 +22,15 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
+// The Gemini free tier's daily request quota (see docs/security.md) is low
+// enough that a public demo can exhaust it — this is a known, accepted
+// trade-off (see README "Trade-offs"), not a bug, so it gets a message that
+// says what actually happened instead of a generic error.
+function isQuotaError(err: unknown): boolean {
+  return (err as { status?: number })?.status === 429;
+}
+const QUOTA_MESSAGE = "Live demo limit reached for today — try one of the example questions above (they're always available).";
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
@@ -53,7 +62,11 @@ export default async function handler(request: Request): Promise<Response> {
       },
     });
     generated = JSON.parse(response.text ?? "{}") as SqlGenerationResult;
-  } catch {
+  } catch (err) {
+    if (isQuotaError(err)) {
+      await trackAskQuestion({ success: false, reason: "quota_exceeded", latency_ms: Date.now() - startedAt });
+      return jsonResponse({ error: QUOTA_MESSAGE }, 429);
+    }
     await trackAskQuestion({ success: false, reason: "generation_error", latency_ms: Date.now() - startedAt });
     return jsonResponse({ error: "Couldn't turn that into a query. Try rephrasing the question." }, 502);
   }
@@ -97,11 +110,14 @@ export default async function handler(request: Request): Promise<Response> {
       contents:
         `Business question: "${question}"\n\n` +
         `Query result (JSON, ${truncatedRows.length} of ${rows.length} rows):\n${JSON.stringify(truncatedRows)}\n\n` +
-        `Answer in 2-3 sentences for a non-technical business reader. Cite concrete numbers from the result. No SQL, no jargon.`,
+        `Answer in 2-3 sentences for a non-technical business reader. Cite concrete numbers from the result. No SQL, no jargon. ` +
+        `If the question asked for a single "top" or "busiest" item and the top rows are tied on the metric being ranked, say so explicitly instead of naming only the first one.`,
     });
     answer = nl.text?.trim() || "Here's what the data shows — see the table below.";
-  } catch {
-    answer = "Got the data, but couldn't summarize it in words this time — see the table below.";
+  } catch (err) {
+    answer = isQuotaError(err)
+      ? "Got the data, but hit today's demo limit before writing it up in words — see the table below."
+      : "Got the data, but couldn't summarize it in words this time — see the table below.";
   }
 
   await trackAskQuestion({ success: true, latency_ms: Date.now() - startedAt, row_count: rows.length });

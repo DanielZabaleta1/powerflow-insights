@@ -46,6 +46,16 @@ HARD RULES:
 7. If the question cannot be answered from these two tables (revenue,
    users, marketing spend, anything not modeled here), set refused=true and
    explain why in refusal_reason instead of inventing columns or guessing.
+8. For "which is THE single busiest/best/top X" questions, never jump
+   straight to ORDER BY ... LIMIT 1 — that silently picks a winner even
+   when two or more rows tie, and the person asking never finds out there
+   was a tie. Instead return the top 5 rows (ORDER BY ... LIMIT 5) so a tie
+   for first place is visible in the data, and say so in "explanation"
+   (e.g. "returns the top 5 so a tie for first place is visible").
+9. When formatting day-of-week or month names with to_char(), wrap the
+   result in trim() (e.g. trim(to_char(created_at, 'Day'))) — Postgres
+   pads 'Day' to a fixed 9 characters, and the untrimmed value looks like
+   a bug in the UI ("Thursday   " with trailing spaces).
 
 Pick "chart" based on the shape of the result: 'line' for a time series
 (grouped by day/week/month), 'bar' for a categorical breakdown (grouped by
@@ -75,6 +85,14 @@ A: {
   "sql": "select date_trunc('week', created_at)::date as week_start, count(*) as leads_created from demo.leads where created_at >= now() - interval '1 month' group by 1 order by 1",
   "explanation": "Counts new leads per week over the last month, so you can see whether volume is trending up or down.",
   "chart": "line",
+  "refused": false
+}
+
+Q: "What's the busiest month for closing deals?"
+A: {
+  "sql": "select date_trunc('month', occurred_at)::date as month, count(distinct lead_id) as deals_won from demo.activities where type = 'won' group by 1 order by deals_won desc limit 5",
+  "explanation": "Ranks months by number of won deals. Returns the top 5 (not just 1) so a tie for the busiest month is visible rather than silently picking one.",
+  "chart": "bar",
   "refused": false
 }
 

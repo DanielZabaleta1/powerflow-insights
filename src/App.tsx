@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { askQuestion } from "./lib/api";
 import { track } from "./lib/track";
+import { CACHED_ANSWERS } from "./lib/cachedAnswers";
 import type { AskResponse } from "./types";
 import AnswerChart from "./components/AnswerChart";
 import DataTable from "./components/DataTable";
@@ -31,6 +32,15 @@ export default function App() {
     const trimmed = q.trim();
     if (!trimmed || state.status === "loading") return;
     setQuestion(trimmed);
+
+    // The 4 suggested questions always work, even if the live API is down
+    // or the day's free-tier Gemini quota is exhausted — no network call.
+    const cached = CACHED_ANSWERS[trimmed];
+    if (cached) {
+      setState({ status: "done", result: cached });
+      return;
+    }
+
     setState({ status: "loading" });
     try {
       const result = await askQuestion(trimmed);
