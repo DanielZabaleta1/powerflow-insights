@@ -127,6 +127,44 @@ didn't check. The blast radius of a total failure at layers 1 and 2 is: a
 security story — not that the AI is well-behaved, but that its failure mode
 is bounded and boring.
 
+## The real risk isn't injection — it's silent reinterpretation
+
+Every risk above is about the AI generating something destructive or
+disallowed. The four layers handle that; a query that shouldn't run,
+doesn't. But the 20-question evaluation set (Fase 6, see
+`db/eval_questions.md`) surfaced a different, more interesting failure mode
+— one that isn't about security at all.
+
+Asked *"Which of our messages got the best response rate?"*, the question
+was deliberately written to be unanswerable: this schema stores aggregate
+activity events (`message_sent`, `touch2_sent`, `reply_received`, …), not
+per-message content or identity, so there's no way to say which specific
+*message* did best. The model didn't refuse. It reinterpreted "messages" as
+"touch stages" (Initial / Touch 2 / Touch 3), wrote a real, correctly-scoped
+SQL query computing a genuine reply rate per touch, and answered fluently —
+with no indication anywhere in the response that it had substituted a
+different question for the one asked.
+
+Daniel's ruling on this (the person who owns the actual business judgment
+here): a **soft fail**, not a pass. The SQL was valid, the numbers were
+real, and the interpretation was arguably reasonable — but a reasonable
+reinterpretation delivered as if it were a direct answer is worse than a
+low-confidence one, because it's indistinguishable from a correct answer
+until someone happens to notice the mismatch between what they asked and
+what the number actually measures. A refusal is safe because it's visibly a
+non-answer. A validation rejection is safe because the layer that catches
+it is mechanical and always fires. Silent reinterpretation is unsafe
+specifically because it looks identical to success.
+
+This is why every answer in this app ships with the SQL and the
+explanation visible (collapsed, not hidden) rather than just the prose
+answer — "show your work" isn't a nice-to-have UI pattern here, it's the
+only reason this particular failure is even catchable. The mitigation this
+finding points to, not yet implemented: the system prompt should instruct
+the model to state explicitly when it has reinterpreted or narrowed a
+question, as a required field in the structured output, rather than
+silently answering the question it decided to answer.
+
 ## Known platform quirk (not a vulnerability)
 
 The Supabase project's `postgres` admin role is automatically a member of

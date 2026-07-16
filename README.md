@@ -42,12 +42,24 @@ This is the actual subject of the project. Full writeup, including a real bug fo
 | Layers 1 and 2 both fail | Connection runs as `insights_readonly`: SELECT-only, scoped to schema `demo`, zero grants anywhere else — including Power Flow OS's real CRM data in `public` | 3 — Postgres role (the layer that actually matters) |
 | A query that's technically valid SELECT but expensive or slow (accidental cross join, `pg_sleep`, …) | `statement_timeout = 5s` set at the role level | 4 — timeout |
 | A syntactically fine query that answers the wrong question | Second Gemini call answers only from the real returned rows; the SQL and explanation are always shown, never hidden | Trust, not security — see [Trade-offs](#trade-offs) |
+| **Model silently reinterprets an unanswerable question instead of refusing** | Showing the SQL/explanation makes the substitution catchable; not yet automatically flagged — see below | Not yet mitigated — real finding, not a hypothetical |
 
 The one-sentence version, tested against Google Cloud's own `pg_sleep`/`pg_read_file` functions: a real gap in layer 2 shipped, `pg_sleep(30)` sailed past the keyword blocklist because of a regex boundary bug, and layer 4 killed it at 5 seconds anyway. `pg_read_file` was rejected outright by layer 3's missing grants. Neither the prompt nor a clever validator is the story — the story is that no single layer had to be perfect.
 
+**The evaluation set found something more interesting than an injection risk.** Asked *"Which of our messages got the best response rate?"* — deliberately unanswerable, since this schema stores aggregate activity events, not per-message content — the model didn't refuse. It quietly reinterpreted "messages" as "touch stages" (Initial / Touch 2 / Touch 3), wrote a real, valid query, and answered fluently with no indication it had substituted a different question for the one asked. Scored as a soft fail, not a pass: the SQL was correct and the interpretation arguably reasonable, but a confident, unflagged reinterpretation is harder to catch than a refusal — it looks identical to a correct answer until someone notices the mismatch. Full writeup: [docs/security.md](docs/security.md#the-real-risk-isnt-injection--its-silent-reinterpretation).
+
 ## Results
 
-*(Filled in once the 20-question evaluation set — Daniel's business questions, not self-graded — has run. See [Definition of done](#status) below for what that measures and how.)*
+20-question evaluation set (`db/eval_questions.md`), Daniel's business questions, scored against `db/ground_truth.md` and live spot-checks — not self-graded.
+
+**13 of 20 questions got a real answer before the Gemini free-tier's 20-requests/day project quota cut the run short** (see [Trade-offs](#trade-offs) for why this is a known, tracked limitation, not a hidden one). Of those 13:
+
+- **11 correct**, numbers independently verified against the live database.
+- **1 soft fail** — the reinterpretation case above.
+- **1 correct-with-a-caveat** — asked for the single busiest month for closing deals, the model answered "March" (5 deals), which is true but omits that April tied it at 5; the query's `ORDER BY ... LIMIT 1` picks one winner from a tie without saying so.
+- **7 not yet attempted** (quota-blocked, including both deliberate-refusal test questions) — remainder of the run pending quota reset, tracked in `plans/portfolio/pasos_daniel.md`, not counted as failures since the model never got the chance to answer.
+
+Also surfaced: `to_char(created_at, 'Day')` returns Postgres's fixed-width, space-padded day names ("Thursday   ") — cosmetic, not a correctness bug, but worth a prompt fix (`FMDay` or `trim()`).
 
 ## Trade-offs
 
@@ -58,10 +70,11 @@ The one-sentence version, tested against Google Cloud's own `pg_sleep`/`pg_read_
 | Claude vs. Gemini for NL→SQL | **Gemini 2.5 Flash** | Same provider as Power Flow OS's own automations — one stack, not two. $0/month on the free tier. The security architecture (4 layers) is provider-agnostic by design; swapping models is a config change, not a rewrite. |
 | One LLM call vs. two | **Two** (generate SQL, then summarize results) | Each call does one job. A single call trying to both write correct SQL *and* phrase a business-friendly sentence about data it hasn't seen yet either over-scopes the prompt or invites the model to guess at numbers instead of reading them. |
 | A deterministic pipeline vs. an agent/LangChain | **Deterministic pipeline** | Two fixed calls with a validator between them is auditable, has predictable latency, and costs a known amount per question. An agent framework earns its complexity when a task needs multi-step exploration — this one doesn't; the schema is two tables. |
+| Free-tier Gemini quota vs. paying for headroom | **Stayed on free tier, accepted the ceiling** | New Google Cloud projects default to a 20-requests/day cap for `gemini-2.5-flash` regardless of which project — not per-key, per-project. Real single-user traffic never approaches that; running a 20-question × 2-call eval batch does. Kept the low-traffic real cost at $0 rather than enabling billing to make one-off bulk testing more convenient. |
 
 ## Cost
 
-$0/month. Gemini 2.5 Flash free tier, PostHog free tier, Supabase already running for Power Flow OS (this project adds one schema, not a new database), Vercel's free tier for a low-traffic serverless function.
+$0/month for real usage. Gemini 2.5 Flash free tier, PostHog free tier, Supabase already running for Power Flow OS (this project adds one schema, not a new database), Vercel's free tier for a low-traffic serverless function. The one place the free tier actually bites is bulk testing (see [Results](#results)) — a single business question a day doesn't come close to the daily cap; a 20-question evaluation batch does.
 
 ## Local dev
 
@@ -80,5 +93,5 @@ npm run dev
 - [x] Power Flow OS instrumented with PostHog + tracking plan — [docs/instrumentation.md](docs/instrumentation.md)
 - [x] `/api/ask` with 4 security layers, structured output
 - [x] Frontend built
-- [ ] 20-question evaluation set run, % reported here honestly
+- [ ] 20-question evaluation set — 13/20 run (see [Results](#results)), 7 remaining once quota resets
 - [ ] Deployed to Vercel
