@@ -2,6 +2,8 @@
 
 **A natural-language query layer over a real product's business data, with AI-generated SQL locked down by four independent security layers.**
 
+**[Live demo →](https://powerflow-insights.vercel.app/)** — try the 4 suggested questions (always available) or ask your own.
+
 ```mermaid
 flowchart LR
     U["Business question<br/>(plain English)"] --> A["/api/ask"]
@@ -97,4 +99,4 @@ npm run dev
 - [x] `/api/ask` with 4 security layers, structured output
 - [x] Frontend built
 - [ ] 20-question evaluation set — 13/20 run (see [Results](#results)), 7 remaining once quota resets
-- [ ] Deployed to Vercel
+- [x] Deployed to Vercel — [powerflow-insights.vercel.app](https://powerflow-insights.vercel.app/)
