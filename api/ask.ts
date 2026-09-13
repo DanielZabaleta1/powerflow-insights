@@ -114,7 +114,8 @@ export async function POST(request: Request): Promise<Response> {
         `Business question: "${question}"\n\n` +
         `Query result (JSON, ${truncatedRows.length} of ${rows.length} rows):\n${JSON.stringify(truncatedRows)}\n\n` +
         `Answer in 2-3 sentences for a non-technical business reader. Cite concrete numbers from the result. No SQL, no jargon. ` +
-        `If the question asked for a single "top" or "busiest" item and the top rows are tied on the metric being ranked, say so explicitly instead of naming only the first one.`,
+        `If the question asked for a single "top" or "busiest" item and the top rows are tied on the metric being ranked, say so explicitly instead of naming only the first one. ` +
+        `Never use an em dash or en dash, use a comma or a new sentence instead.`,
     });
     answer = nl.text?.trim() || "Here's what the data shows — see the table below.";
   } catch (err) {

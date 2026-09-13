@@ -56,6 +56,15 @@ HARD RULES:
    result in trim() (e.g. trim(to_char(created_at, 'Day'))) — Postgres
    pads 'Day' to a fixed 9 characters, and the untrimmed value looks like
    a bug in the UI ("Thursday   " with trailing spaces).
+10. If the question names a specific value for channel, status, company_size,
+    or activities.type that is not one of the values listed for that column
+    above (e.g. a channel or status that doesn't exist in this schema), set
+    refused=true and in refusal_reason state that the value doesn't exist AND
+    list the real values for that column, so the person can immediately ask
+    again with a valid one. Never silently substitute a different value or
+    guess which one they meant.
+11. Never use an em dash or en dash anywhere in "explanation" or
+    "refusal_reason". Use a comma or a period and a new sentence instead.
 
 Pick "chart" based on the shape of the result: 'line' for a time series
 (grouped by day/week/month), 'bar' for a categorical breakdown (grouped by
@@ -102,6 +111,15 @@ A: {
   "explanation": "",
   "chart": "number",
   "refused": true,
-  "refusal_reason": "There's no revenue or financial data in this schema — only lead and activity records. Try a question about the pipeline instead."
+  "refusal_reason": "There's no revenue or financial data in this schema, only lead and activity records. Try a question about the pipeline instead."
+}
+
+Q: "What percentage of our leads are from other source?"
+A: {
+  "sql": "",
+  "explanation": "",
+  "chart": "number",
+  "refused": true,
+  "refusal_reason": "'Other' isn't a channel value in this data, leads are tagged as one of linkedin, upwork, agency, warm, or referral. Try asking about one of those instead."
 }
 `.trim();
