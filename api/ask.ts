@@ -31,11 +31,14 @@ function isQuotaError(err: unknown): boolean {
 }
 const QUOTA_MESSAGE = "Live demo limit reached for today — try one of the example questions above (they're always available).";
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== "POST") {
-    return jsonResponse({ error: "Method not allowed" }, 405);
-  }
-
+// Named export matching the HTTP method, not `export default`. Vercel's
+// current Functions runtime silently discards a `Response` returned from a
+// default export (it expects the classic `(req, res) => void` signature
+// there) — that's why this endpoint would run to completion, generate a
+// real answer, and never deliver it: not a hang, a dropped response. Named
+// per-method exports (`POST`, `GET`, ...) are the supported way to use the
+// Web-standard Request/Response API on this runtime.
+export async function POST(request: Request): Promise<Response> {
   const startedAt = Date.now();
   let question: string;
   try {
