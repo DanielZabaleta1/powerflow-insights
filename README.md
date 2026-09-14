@@ -4,6 +4,10 @@
 
 **[Live demo →](https://powerflow-insights.vercel.app/)** — try the 4 suggested questions (always available) or ask your own.
 
+[![Watch the walkthrough video](https://i.ytimg.com/vi/0yFIMMvVkGQ/hqdefault.jpg)](https://youtu.be/0yFIMMvVkGQ)
+
+*[▶ Watch the 2-minute walkthrough](https://youtu.be/0yFIMMvVkGQ)*
+
 ```mermaid
 flowchart LR
     U["Business question<br/>(plain English)"] --> A["/api/ask"]
