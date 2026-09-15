@@ -4,9 +4,7 @@
 
 **[Live demo →](https://powerflow-insights.vercel.app/)** — try the 4 suggested questions (always available) or ask your own.
 
-[![Watch the walkthrough video](https://i.ytimg.com/vi/0yFIMMvVkGQ/hqdefault.jpg)](https://youtu.be/0yFIMMvVkGQ)
-
-*[▶ Watch the 2-minute walkthrough](https://youtu.be/0yFIMMvVkGQ)*
+https://github.com/user-attachments/assets/af70001d-150d-4138-886c-80631c6f7984
 
 ```mermaid
 flowchart LR
